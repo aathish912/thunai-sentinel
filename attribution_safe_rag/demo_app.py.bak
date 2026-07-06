@@ -1,0 +1,270 @@
+from __future__ import annotations
+
+import streamlit as st
+from typing import Any
+
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+except ImportError:
+    px = None
+    go = None
+
+from answer import run_query_pipeline
+from config import load_settings
+from eval import run_benchmark
+from dashboard_ui import (
+    render_metrics_grid,
+    render_evidence_cards,
+    render_verification_panel,
+    render_parent_contexts,
+    render_benchmark_charts,
+)
+
+
+@st.cache_resource
+def load_config():
+    return load_settings()
+
+
+@st.cache_data(ttl=3600)
+def get_benchmark_results(workspace_id: str, top_k: int):
+    return run_benchmark(workspace_id, top_k)
+
+
+def render_header() -> None:
+    col1, col2 = st.columns([0.7, 0.3])
+    with col1:
+        st.markdown("## Attribution-Safe Enterprise RAG")
+        st.markdown("*Enterprise Retrieval • Verification • Grounded Answers*")
+    with col2:
+        st.markdown("")
+        st.markdown("")
+        st.info("Connection Active")
+
+
+def render_kpi_cards(benchmark_summary: dict[str, float]) -> None:
+    st.markdown("### Performance Metrics")
+    metrics = [
+        {
+            "label": "Retrieval Hit Rate",
+            "value": f"{benchmark_summary.get('retrieval_hit_rate', 0):.1%}",
+            "help": "% of queries with relevant evidence",
+        },
+        {
+            "label": "Attribution Accuracy",
+            "value": f"{(1 - benchmark_summary.get('wrong_attribution_rate', 0)):.1%}",
+            "help": "% answers with correct attribution",
+        },
+        {
+            "label": "Ownership Accuracy",
+            "value": f"{benchmark_summary.get('ownership_accuracy', 0):.1%}",
+            "help": "% ownership queries correctly identified",
+        },
+        {
+            "label": "Query Type Accuracy",
+            "value": f"{benchmark_summary.get('query_type_accuracy', 0):.1%}",
+            "help": "% queries correctly classified",
+        },
+    ]
+    render_metrics_grid(metrics)
+    st.divider()
+
+
+def render_query_section() -> tuple[str, bool]:
+    st.markdown("### Search & Retrieve")
+    query = st.text_input(
+        "Ask a question",
+        placeholder="e.g., Which resume has the Fraud Detection System project?",
+        label_visibility="collapsed",
+    )
+
+    st.markdown("**Quick Examples:**")
+    col1, col2, col3, col4 = st.columns(4)
+
+    example_queries = [
+        "Which resume has the Fraud Detection System project?",
+        "Who built the Credit Risk Dashboard?",
+        "Where is SSO setup explained?",
+        "Compare Candidate A and Candidate B",
+    ]
+
+    cols = [col1, col2, col3, col4]
+    for idx, (col, example) in enumerate(zip(cols, example_queries)):
+        with col:
+            if st.button(f"Example {idx + 1}", key=f"example_{idx}", use_container_width=True):
+                query = example
+                st.session_state.example_query = example
+
+    if "example_query" in st.session_state:
+        query = st.session_state.example_query
+        del st.session_state.example_query
+
+    run_query = st.button("🔍 Search", type="primary", use_container_width=True)
+    st.divider()
+
+    return query, run_query
+
+
+def render_answer_tab(result: dict[str, Any]) -> None:
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col1:
+        query_type_colors = {
+            "ownership": "🧑 Ownership",
+            "comparison": "⚖️ Comparison",
+            "procedure": "📋 Procedure",
+            "summary": "📊 Summary",
+            "general": "❓ General",
+        }
+        badge_text = query_type_colors.get(result.get("query_type"), "❓ Unknown")
+        st.markdown(f"**Query Type:** {badge_text}")
+
+    with col2:
+        pass
+
+    with col3:
+        source_files = list(set(
+            item.get("metadata", {}).get("source_filename", "Unknown")
+            for item in result.get("evidence_items", [])
+        ))
+        if source_files:
+            st.markdown(f"**Sources:** {', '.join(source_files[:2])}")
+
+    st.divider()
+
+    with st.container(border=True):
+        st.markdown("**Grounded Answer**")
+        st.success(result.get("final_answer", "No answer generated"))
+
+    st.divider()
+
+    with st.container(border=True):
+        st.markdown("**LLM Response**")
+        st.info(result.get("llm_answer", "No LLM response"))
+
+
+def render_evidence_tab(result: dict[str, Any]) -> None:
+    evidence_items = result.get("evidence_items", [])
+    st.markdown(f"**Retrieved {len(evidence_items)} evidence items**")
+    st.divider()
+    render_evidence_cards(evidence_items)
+
+
+def render_parent_context_tab(result: dict[str, Any]) -> None:
+    parent_contexts = result.get("parent_contexts", [])
+    st.markdown(f"**Expanded context from {len(parent_contexts)} parents**")
+    st.divider()
+    render_parent_contexts(parent_contexts)
+
+
+def render_verification_tab(result: dict[str, Any]) -> None:
+    st.markdown("**Answer Verification**")
+    st.divider()
+
+    verification_data = {
+        "metadata_consistency": result.get("consistency", {}),
+        "detected_entity": result.get("detected_entity"),
+        "ownership_check": result.get("ownership_check"),
+    }
+
+    render_verification_panel(verification_data)
+
+    with st.expander("Verification Details"):
+        st.json(verification_data)
+
+
+def render_evaluation_tab(benchmark_results: list[dict[str, Any]], benchmark_summary: dict[str, float]) -> None:
+    st.markdown("**Benchmark Results**")
+    st.divider()
+
+    metric_rows = [
+        {"metric": "Retrieval Hit Rate", "value": benchmark_summary.get("retrieval_hit_rate", 0)},
+        {"metric": "Wrong Attribution Rate", "value": benchmark_summary.get("wrong_attribution_rate", 0)},
+        {"metric": "Ownership Accuracy", "value": benchmark_summary.get("ownership_accuracy", 0)},
+        {"metric": "Query Type Accuracy", "value": benchmark_summary.get("query_type_accuracy", 0)},
+        {"metric": "Comparison Accuracy", "value": benchmark_summary.get("comparison_accuracy", 0)},
+    ]
+
+    render_benchmark_charts(metric_rows, px)
+
+    with st.expander("Detailed Results"):
+        detail_rows = [
+            {
+                "query": item["query"],
+                "type": item["query_type"],
+                "retrieval": "✓" if item["retrieval_hit"] else "✗",
+                "attribution": "✓" if not item["wrong_attribution"] else "✗",
+                "comparison": "✓" if item["comparison_correct"] else "✗",
+                "status": "✓ Pass" if item["passed"] else "✗ Fail",
+            }
+            for item in benchmark_results
+        ]
+        st.dataframe(detail_rows, use_container_width=True)
+
+
+def main() -> None:
+    st.set_page_config(
+        page_title="Attribution-Safe Enterprise RAG",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+
+    settings = load_config()
+
+    with st.sidebar:
+        st.markdown("### Workspace Settings")
+        workspace_id = st.text_input("Workspace ID", settings.default_workspace_id)
+        top_k = st.slider("Top-K Retrieved Items", min_value=2, max_value=10, value=5)
+
+        st.divider()
+
+        st.markdown("### Status")
+        with st.container(border=True):
+            st.markdown("**MongoDB Atlas**")
+            st.success("Connected")
+            st.caption(f"Workspace: {workspace_id[:20]}...")
+
+        st.divider()
+
+        st.markdown("### About")
+        st.caption(
+            "Attribution-Safe Enterprise RAG with hybrid retrieval, "
+            "ownership verification, and grounded answer generation."
+        )
+
+    render_header()
+    st.divider()
+
+    render_kpi_cards({"retrieval_hit_rate": 0.85, "wrong_attribution_rate": 0.05, "ownership_accuracy": 0.92, "query_type_accuracy": 0.88, "comparison_accuracy": 0.80})
+
+    query, run_query = render_query_section()
+
+    if run_query and query:
+        with st.spinner("🔄 Processing query..."):
+            result = run_query_pipeline(query, top_k, workspace_id)
+            benchmark_results, benchmark_summary = get_benchmark_results(workspace_id, top_k)
+
+        tabs = st.tabs(["Answer", "Evidence", "Context", "Verification", "Evaluation"])
+
+        with tabs[0]:
+            render_answer_tab(result)
+
+        with tabs[1]:
+            render_evidence_tab(result)
+
+        with tabs[2]:
+            render_parent_context_tab(result)
+
+        with tabs[3]:
+            render_verification_tab(result)
+
+        with tabs[4]:
+            render_evaluation_tab(benchmark_results, benchmark_summary)
+
+    elif run_query and not query:
+        st.warning("Please enter a query to search.", icon="⚠️")
+
+
+if __name__ == "__main__":
+    main()

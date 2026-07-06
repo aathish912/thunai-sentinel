@@ -1,0 +1,19 @@
+Title: SSO and Dashboard Access Guide
+Owner: Enterprise Support Team
+Department: Customer Success
+Product: Thunai Assist
+
+Overview:
+This guide explains how enterprise users can sign in with single sign-on, access the analytics dashboard, and troubleshoot common login failures.
+
+SSO Setup:
+To enable SSO, an administrator must configure the identity provider metadata, upload the signing certificate, and verify the callback URL in the admin console.
+
+Dashboard Login Instructions:
+Users should open the dashboard URL, choose Sign in with SSO, and enter their company email address. If the workspace has multiple domains, users must select the correct tenant before authentication continues.
+
+Troubleshooting:
+If login fails with an invalid assertion error, confirm that the identity provider clock skew is within five minutes and that the certificate has not expired.
+
+Escalation:
+If SSO is still failing after configuration review, collect the tenant ID, timestamp, and affected user emails, then escalate the issue to the platform engineering queue.

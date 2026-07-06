@@ -1,0 +1,15 @@
+Title: Resume - Candidate A
+Candidate_Name: Candidate A
+
+Summary:
+Candidate A is a machine learning engineer with experience building production fraud analytics systems, model pipelines, and investigation tooling for financial operations teams.
+
+Experience:
+At FinSecure Labs, Candidate A led the Fraud Detection System project for card transaction monitoring. The project combined anomaly detection, feature engineering, and alert triage workflows to help investigators review suspicious activity faster.
+
+Projects:
+Fraud Detection System
+Built a fraud risk pipeline that scored transactions in near real time, reduced manual review time, and surfaced explainable flags for high-risk events.
+
+Skills:
+Python, SQL, machine learning, anomaly detection, model deployment, data pipelines

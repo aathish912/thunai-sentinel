@@ -1,0 +1,15 @@
+Title: Resume - Candidate B
+Candidate_Name: Candidate B
+
+Summary:
+Candidate B is a data scientist focused on financial machine learning, analytics dashboards, and decision-support systems for lending and operations teams.
+
+Experience:
+At CreditVista Analytics, Candidate B worked on a Credit Risk Dashboard for loan portfolio monitoring, model explainability, and stakeholder reporting across multiple business units.
+
+Projects:
+Credit Risk Dashboard
+Designed a similarity-based analytics workflow for loan assessment and portfolio segmentation, with dashboard visualizations and model monitoring.
+
+Skills:
+Python, SQL, machine learning, dashboards, model monitoring, financial analytics
